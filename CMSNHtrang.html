@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Birthday Surprise Autoplay</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <style>
+    /* ==========================
+       Base styles
+       ========================== */
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #ff99cc; /* pastel hồng */
+      overflow: hidden;
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+    }
+
+    /* Floating hearts (emoji) */
+    .emoji-heart {
+      position: fixed;
+      top: 100vh;
+      font-size: 24px;
+      pointer-events: none;
+      animation: floatEmoji linear forwards;
+      z-index: 2;
+    }
+    @keyframes floatEmoji {
+      0% { transform: translateY(0) scale(0.8) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(-120vh) scale(1.2) rotate(360deg); opacity: 0; }
+    }
+
+    /* ==========================
+       Welcome banner (câu chào mở đầu)
+       ========================== */
+    .welcome-banner {
+      position: fixed;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(255,250,240,0.9);
+      padding: 12px 24px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      font-size: 18px;
+      color: #ad1457;
+      z-index: 100;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity:1; }
+      to { opacity:0; }
+    }
+
+    /* Banner + image */
+    .banner {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+      pointer-events: none;
+    }
+    .image-wrap {
+      background: #fffaf0;
+      padding: 18px;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      display: block;
+      width: min(86vw, 360px);
+      box-sizing: border-box;
+    }
+    #birthday-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      user-select: none;
+    }
+
+    /* Zoom + bounce khi hiện ảnh */
+    @keyframes zoomBounce {
+      0% { transform: scale(0.5); opacity: 0; }
+      60% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .zoom-bounce {
+      animation: zoomBounce 1s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    /* Sticker explosion */
+    .sticker {
+      position: fixed;
+      pointer-events: none;
+      will-change: transform, opacity;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.05);
+      z-index: 6;
+    }
+
+    /* Confetti */
+    .confetti {
+      position: fixed;
+      pointer-events: none;
+      z-index: 7;
+      will-change: transform, opacity;
+    }
+
+    /* Paper + typewriter */
+    .paper {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      width: min(86vw, 500px);
+      max-height: 80vh;
+      padding: 15px;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      line-height: 25px;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      background: none;
+      z-index: 8;
+      opacity: 0;
+      pointer-events: auto;
+    }
+    .paper::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        white,
+        white 1.4em,
+        #999 1.45em
+      );
+      z-index: 0;
+      pointer-events: none;
+    }
+    .paper .text { position: relative; z-index: 1; }
+    .paper .cursor {
+      display: inline-block;
+      width: 10px;
+      background: black;
+      margin-left: 2px;
+      animation: blink 1s infinite;
+      vertical-align: bottom;
+      z-index: 1;
+    }
+    @keyframes blink { 0%,50% {opacity:1;} 50.01%,100% {opacity:0;} }
+    .paper.show {
+      animation: wishFadeIn 0.8s cubic-bezier(.2,.8,.2,1) forwards;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Matrix canvas + centerText */
+    #matrixCanvas {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 40;
+    }
+    #centerText {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%) scale(0.5);
+      font-size: 0px;
+      font-family: 'Arial', sans-serif;
+      color: #ffffff;
+      text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+      animation: appear 3s ease-out forwards, pulse 1s ease-in-out infinite 3s;
+      white-space: nowrap;
+      z-index: 50;
+    }
+    @keyframes appear {
+      0% { opacity:0; font-size:0; transform:translate(-50%,-50%) scale(0.5);}
+      100% { opacity:1; font-size:48px; transform:translate(-50%,-50%) scale(1);}
+    }
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1);}
+      50% { transform: translate(-50%, -50%) scale(1.05);}
+      100% { transform: translate(-50%, -50%) scale(1);}
+    }
+
+    /* ==========================
+       Media Queries
+       ========================== */
+    @media (max-width: 360px) {
+      .welcome-banner { font-size:14px; padding:8px 16px; }
+      .paper { width:95vw; min-height:220px; font-size:14px; line-height:20px; }
+      .paper .cursor { width:6px; }
+      #centerText { font-size:24px !important; transform:translate(-50%,-50%) scale(0.5); }
+    }
+    @media (min-width:361px) and (max-width:480px) {
+      .paper { width:90vw; min-height:240px; font-size:15px; line-height:22px; }
+      #centerText { font-size:28px !important; transform:translate(-50%,-50%) scale(0.5); }
+    }
+    @media (min-width:481px) and (max-width:768px) {
+      .paper { width:86vw; min-height:280px; font-size:16px; line-height:24px; }
+      #centerText { font-size:32px !important; transform:translate(-50%,-50%) scale(0.5); }
+    }
+    @media (min-width:769px) {
+      .paper { width:min(86vw,500px); min-height:300px; font-size:18px; line-height:25px; }
+      #centerText { font-size:48px !important; transform:translate(-50%,-50%) scale(1); }
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Welcome banner -->
+  <div class="welcome-banner" id="welcome-banner">
+    Htrang oiii, có một bất ngờ nho nhỏ dành cho ní đây 🎉
+  </div>
+
+  <!-- Banner ảnh -->
+  <div class="banner" id="banner">
+    <div class="image-wrap" id="image-wrap">
+      <img id="birthday-img" src="https://i.pinimg.com/736x/d9/fd/35/d9fd353918a5c88c89812eeb10cc4171.jpg" alt="Happy Birthday">
+    </div>
+  </div>
+
+  <!-- Paper -->
+  <div class="paper" id="paper">
+    <span class="text" id="text"></span><span class="cursor"></span>
+  </div>
+
+  <!-- Matrix -->
+  <canvas id="matrixCanvas"></canvas>
+  <div id="centerText">Hép pi bớt đây Htrangg nhó</div>
+
+  <script>
+    // ==========================
+    // Floating hearts
+    // ==========================
+    function createEmojiHeart() {
+      const emojiList = ["❤️","🩷","💖","💕","💘"];
+      const heart = document.createElement("span");
+      heart.className = "emoji-heart";
+      heart.textContent = emojiList[Math.floor(Math.random() * emojiList.length)];
+      heart.style.left = `${Math.random() * 100}vw`;
+      heart.style.fontSize = `${16 + Math.random() * 24}px`;
+      heart.style.animationDuration = `${3 + Math.random() * 3}s`;
+      document.body.appendChild(heart);
+      setTimeout(() => heart.remove(), 6000);
+    }
+    setInterval(createEmojiHeart, 150);
+
+    // ==========================
+    // Confetti
+    // ==========================
+    function explodeConfetti() {
+      for (let i=0;i<50;i++){
+        const confetti = document.createElement("div");
+        confetti.className="confetti";
+        confetti.style.left=`50%`;
+        confetti.style.top=`50%`;
+        confetti.style.width=`${8 + Math.random()*8}px`;
+        confetti.style.height=`${10 + Math.random()*12}px`;
+        confetti.style.borderRadius = Math.random()>0.5?"50%":"2px";
+        confetti.style.background=["#e91e63","#ff5722","#ffeb3b","#4caf50","#2196f3"][Math.floor(Math.random()*5)];
+        confetti.style.opacity=1;
+        confetti.style.transform="translate(-50%,-50%)";
+        confetti.style.zIndex=7;
+        document.body.appendChild(confetti);
+
+        const angle = Math.random()*2*Math.PI;
+        const dist = 100 + Math.random()*150;
+        const x = Math.cos(angle)*dist;
+        const y = Math.sin(angle)*dist;
+        const dur = 1000 + Math.random()*700;
+
+        confetti.animate([
+          { transform:"translate(-50%,-50%)", opacity:1 },
+          { transform:`translate(${x}px,${y}px) rotate(${Math.random()*720}deg)`, opacity:0 }
+        ], { duration:dur, easing:"ease-out", fill:"forwards" });
+
+        setTimeout(()=>confetti.remove(), dur+50);
+      }
+    }
+
+    // ==========================
+    // Sticker explosion
+    // ==========================
+    function explodeImage360(){
+      const imgWrap = document.getElementById("image-wrap");
+      const rect = imgWrap.getBoundingClientRect();
+      const stickers = ["\u{1F382}","\u{1F380}","\u{1F36D}","\u{1F389}","\u{1F381}"];
+      const rows = 6, cols = 10;
+      for(let i=0;i<rows;i++){
+        for(let j=0;j<cols;j++){
+          const sticker=document.createElement("div");
+          sticker.className="sticker";
+          sticker.textContent=stickers[Math.floor(Math.random()*stickers.length)];
+          const startX=rect.left+(j+0.5)/cols*rect.width;
+          const startY=rect.top+(i+0.5)/rows*rect.height;
+          sticker.style.left=`${startX}px`;
+          sticker.style.top=`${startY}px`;
+          sticker.style.fontSize=`${12+Math.random()*20}px`;
+          document.body.appendChild(sticker);
+
+          const angle=Math.random()*2*Math.PI;
+          const dist=60+Math.random()*180;
+          const x=Math.cos(angle)*dist;
+          const y=Math.sin(angle)*dist;
+          const rotate=Math.random()*720-360;
+          const dur=1000+Math.random()*700;
+
+          sticker.animate([
+            { transform:"translate(0,0) rotate(0deg)", opacity:1 },
+            { transform:`translate(${x}px,${y}px) rotate(${rotate}deg)`, opacity:0 }
+          ], { duration:dur, easing:"cubic-bezier(0.6,-0.28,0.735,0.045)", fill:"forwards" });
+
+          setTimeout(()=>sticker.remove(), dur+80);
+        }
+      }
+
+      imgWrap.style.display="none";
+      setTimeout(()=>{
+        const paper = document.getElementById("paper");
+        paper.classList.add("show");
+        runTypewriter();
+      },1800);
+    }
+
+    // ==========================
+    // Typewriter
+    // ==========================
+    const message = `Gửi Hy Hoàng 🎂  
+Chúc mừng sinh nhật! Hôm nay là 14/10/2025, chúc cậu một ngày thật vui 🎉  
+
+Tuổi mới, chúc Htrangg luôn hạnh phúc, bình an và tràn đầy năng lượng 🌸  
+
+Cuộc sống có thể không nhẹ nhàng với cậu, nhưng mong rằng sẽ luôn có những người quan trọng sẵn sàng sẻ chia, đồng hành cùng cậu 🎉🧁    
+From Qvinhh
+`;
+
+    function runTypewriter(){
+      const textEl = document.getElementById("text");
+      let i=0;
+      textEl.textContent="";
+      function typeSlow(){
+        if(i<message.length){
+          textEl.textContent+=message.charAt(i);
+          i++;
+          setTimeout(typeSlow,50);
+        }else{
+          setTimeout(showMatrixScene,1500);
+        }
+      }
+      typeSlow();
+    }
+
+    // ==========================
+    // Show banner & animations
+    // ==========================
+    function showBanner(){
+      const banner = document.getElementById("banner");
+      const img = document.getElementById("birthday-img");
+      const imgWrap = document.getElementById("image-wrap");
+      const paper = document.getElementById("paper");
+
+      banner.style.display="block";
+      imgWrap.style.display="block";
+
+      img.classList.remove("zoom-bounce");
+      void img.offsetWidth;
+      img.classList.add("zoom-bounce");
+
+      explodeConfetti();
+      setTimeout(explodeImage360,2000);
+    }
+
+    // ==========================
+    // Matrix scene
+    // ==========================
+    function showMatrixScene(){
+      document.querySelectorAll(".emoji-heart").forEach(el=>el.remove());
+      document.querySelectorAll(".confetti").forEach(el=>el.remove());
+      document.querySelectorAll(".sticker").forEach(el=>el.remove());
+
+      document.getElementById("banner").style.display="none";
+      document.getElementById("paper").style.display="none";
+
+      document.body.style.backgroundColor="#000";
+      startMatrixDemo();
+    }
+
+    function startMatrixDemo(){
+      const canvas=document.getElementById("matrixCanvas");
+      const ctx=canvas.getContext("2d");
+      const centerText=document.getElementById("centerText");
+      canvas.style.display="block";
+      centerText.style.display="block";
+
+      function resizeCanvas(){canvas.width=window.innerWidth; canvas.height=window.innerHeight;}
+      resizeCanvas();
+      window.addEventListener("resize",resizeCanvas);
+
+      const fontSize=20;
+      const phrase="14102007 ";
+      const columns=Math.floor(window.innerWidth/fontSize);
+      const drops=[];
+      for(let i=0;i<columns;i++){drops[i]={y:Math.random()*-50, speed:Math.random()*1.5+0.5, phaseOffset:Math.random()*1000};}
+
+      const neonColors=[[255,0,255],[102,252,241],[255,102,204]];
+
+      function lerpColor(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)];}
+      function getAnimatedColor(time,phase=0){const speed=0.001; const totalColors=neonColors.length; const totalTime=(time+phase)*speed; const index=Math.floor(totalTime)%totalColors; const nextIndex=(index+1)%totalColors; const localT=totalTime-Math.floor(totalTime); const c=lerpColor(neonColors[index], neonColors[nextIndex], localT); return `rgb(${c[0]},${c[1]},${c[2]})`;}
+
+      function draw(){
+        const time=performance.now();
+        ctx.fillStyle="rgba(0,0,0,0.05)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.font=fontSize+"px monospace";
+        for(let i=0;i<columns;i++){
+          const drop=drops[i];
+          const x=i*fontSize;
+          const y=drop.y*fontSize;
+          const color=getAnimatedColor(time,drop.phaseOffset);
+          ctx.fillStyle=color;
+          ctx.shadowColor=color;
+          ctx.shadowBlur=12;
+          for(let j=0;j<phrase.length;j++){
+            ctx.fillText(phrase[j],x,y+j*fontSize);
+          }
+          drop.y+=drop.speed;
+          if(y>canvas.height+phrase.length*fontSize){drop.y=Math.random()*-20; drop.speed=Math.random()*1.2+0.3;}
+        }
+        requestAnimationFrame(draw);
+      }
+      draw();
+    }
+
+    // ==========================
+    // Autoplay from load
+    // ==========================
+    window.addEventListener("load", ()=>{
+      const welcomeBanner=document.getElementById("welcome-banner");
+      // 2s hiển thị, 1s fade out
+      setTimeout(()=>{
+        welcomeBanner.style.animation="fadeOut 1s forwards";
+        setTimeout(showBanner,1000);
+      },2000);
+    });
+
+  </script>
+</body>
+</html>
